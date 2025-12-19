@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom' // נשתמש בלינק רגיל של HTML בינתיים אם אין ראוטר
-
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4 dir-rtl font-sans">
