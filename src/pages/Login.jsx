@@ -7,151 +7,180 @@ const supabase = createClient(
 )
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [businessName, setBusinessName] = useState('') // שדה חדש לשם העסק
-  
+  const [isSignUp, setIsSignUp] = useState(false) // בורר בין התחברות להרשמה
   const [loading, setLoading] = useState(false)
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [msg, setMsg] = useState('')
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    businessName: '',
+    phone: ''
+  })
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const handleAuth = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    setMsg('')
+    setErrorMsg('')
 
     try {
       if (isSignUp) {
-        // --- תהליך הרשמה (מורכב יותר) ---
+        // --- תהליך הרשמה ---
         
-        // 1. יצירת המשתמש
+        // 1. יצירת משתמש ב-Auth
         const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password,
+          email: formData.email,
+          password: formData.password,
         })
-        if (authError) throw authError
 
-        // 2. יצירת העסק בטבלה (רק אם המשתמש נוצר בהצלחה)
-        if (authData.user) {
-          const { error: bizError } = await supabase
-            .from('businesses')
-            .insert([
-              { 
-                name: businessName,
-                owner_id: authData.user.id 
-              }
-            ])
-          
-          if (bizError) {
-            // במקרה נדיר שהמשתמש נוצר אבל העסק לא - כדאי לדעת
-            console.error('Business creation failed:', bizError)
-            throw new Error('המשתמש נוצר אך הייתה שגיאה ביצירת העסק.')
-          }
-        }
+        if (authError) throw authError
+        if (!authData.user) throw new Error('שגיאה ביצירת משתמש')
+
+        // 2. יצירת העסק בטבלה
+        const { error: bizError } = await supabase
+          .from('businesses')
+          .insert([{
+            owner_id: authData.user.id,
+            name: formData.businessName,
+            phone: formData.phone || '',
+            email: formData.email
+          }])
+
+        if (bizError) throw bizError
+
+        // רענון כדי להיכנס לדשבורד
+        window.location.reload()
 
       } else {
-        // --- תהליך התחברות (פשוט) ---
-        const { error } = await supabase.auth.signInWithPassword({ 
-          email, 
-          password 
+        // --- תהליך התחברות ---
+        const { error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
         })
         if (error) throw error
+        
+        // המעבר לדשבורד יקרה אוטומטית ב-App.jsx ברגע שיש סשן
+        window.location.reload()
       }
+
     } catch (error) {
-      setMsg(error.message || 'אירעה שגיאה')
+      console.error('Auth error:', error)
+      setErrorMsg(error.message === 'Invalid login credentials' 
+        ? 'אימייל או סיסמה שגויים' 
+        : 'אירעה שגיאה. נסה שנית או בדוק את הפרטים.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 font-sans text-right dir-rtl">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 dir-rtl font-sans p-4">
+      
+      {/* כפתור חזרה לדף הבית */}
+      <a href="/" className="absolute top-6 left-6 text-gray-400 hover:text-blue-600 font-bold transition flex items-center gap-2">
+        <span>חזרה לדף הבית</span>
+        <span>🏠</span>
+      </a>
+
+      <div className="bg-white rounded-3xl shadow-2xl border border-white/50 w-full max-w-md overflow-hidden animate-fade-in-up">
         
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">
-            {isSignUp ? 'רישום עסק חדש 🚀' : 'כניסה למערכת הניהול'}
-          </h2>
-          <p className="text-gray-500">
-            {isSignUp ? 'הצטרף ונהל את פניות הלקוחות שלך בקלות' : 'ברוך שובך! הזן פרטים להתחברות'}
-          </p>
+        {/* Header */}
+        <div className="bg-gray-900 p-8 text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-600 to-purple-600 opacity-20"></div>
+          <div className="relative z-10">
+            <h1 className="text-3xl font-black text-white mb-2" style={{ fontFamily: 'Rubik, sans-serif' }}>
+              {isSignUp ? 'הקמת עסק חדש' : 'כניסה למערכת 🔐'}
+            </h1>
+            <p className="text-gray-400 text-sm">
+              {isSignUp ? 'הצטרף ונהל את הפניות שלך בקלות' : 'שמחים לראות אותך שוב'}
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-5">
+        <div className="p-8">
           
-          {/* שדה שם העסק - מופיע רק בהרשמה */}
-          {isSignUp && (
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">שם העסק</label>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            
+            {/* שדות שמופיעים רק בהרשמה */}
+            {isSignUp && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-gray-700">שם בית העסק</label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="למשל: AvraSystem"
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                    value={formData.businessName}
+                    onChange={e => setFormData({...formData, businessName: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-gray-700">טלפון העסק</label>
+                  <input
+                    type="tel"
+                    placeholder="05...."
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                    value={formData.phone}
+                    onChange={e => setFormData({...formData, phone: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* שדות קבועים (אימייל וסיסמה) */}
+            <div className="space-y-1">
+              <label className="text-sm font-bold text-gray-700">אימייל</label>
               <input
-                type="text"
                 required
-                className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition text-right"
-                placeholder="למשל: מוסך המרכז, מספרת דני..."
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
+                type="email"
+                placeholder="your@email.com"
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                value={formData.email}
+                onChange={e => setFormData({...formData, email: e.target.value})}
               />
             </div>
-          )}
 
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">כתובת אימייל</label>
-            <input
-              type="email"
-              required
-              className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition text-right"
-              dir="ltr" // טקסט באנגלית מיושר לשמאל בתוך השדה
-              style={{ textAlign: 'right' }} // אבל הכתיבה מתחילה מימין
-              placeholder="name@business.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+            <div className="space-y-1">
+              <label className="text-sm font-bold text-gray-700">סיסמה</label>
+              <input
+                required
+                type="password"
+                placeholder="********"
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                value={formData.password}
+                onChange={e => setFormData({...formData, password: e.target.value})}
+              />
+            </div>
+
+            {errorMsg && (
+              <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg text-center border border-red-100">
+                {errorMsg}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 rounded-xl font-black text-white bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
+            >
+              {loading ? 'טוען...' : (isSignUp ? 'צור חשבון בקליק ובחינם' : 'התחבר למערכת ➜')}
+            </button>
+
+          </form>
+
+          {/* מעבר בין מצבים */}
+          <div className="mt-6 text-center pt-6 border-t border-gray-100">
+            <p className="text-gray-500 text-sm mb-2">
+              {isSignUp ? 'כבר יש לך חשבון?' : 'עדיין אין לך חשבון?'}
+            </p>
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-blue-600 font-black hover:underline"
+            >
+              {isSignUp ? 'התחבר כאן' : 'צור חשבון חדש בקליק ובחינם'}
+            </button>
           </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-bold text-gray-700">סיסמה</label>
-                {!isSignUp && (
-                    <button type="button" className="text-xs text-blue-600 hover:underline">
-                        שכחת סיסמה?
-                    </button>
-                )}
-            </div>
-            <input
-              type="password"
-              required
-              className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition text-right"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          {msg && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm text-center">
-              {msg}
-            </div>
-          )}
-
-          <button
-            disabled={loading}
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
-          >
-            {loading ? 'מעבד נתונים...' : (isSignUp ? 'פתח עסק חדש בחינם' : 'התחבר לדשבורד')}
-          </button>
-        </form>
-
-        <div className="mt-8 pt-6 border-t border-gray-100 text-center text-gray-500 text-sm">
-          {isSignUp ? 'כבר רשום למערכת? ' : 'עדיין אין לך חשבון עסקי? '}
-          <button
-            onClick={() => {
-                setIsSignUp(!isSignUp)
-                setMsg('')
-            }}
-            className="text-blue-600 hover:text-blue-800 font-bold hover:underline transition"
-          >
-            {isSignUp ? 'התחבר כאן' : 'הירשם עכשיו'}
-          </button>
         </div>
       </div>
     </div>

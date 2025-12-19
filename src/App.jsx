@@ -3,7 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import NewTicket from './pages/NewTicket'
-import Home from './pages/Home' // <--- הוספנו את זה
+import SearchBusiness from './pages/SearchBusiness'
+import Home from './pages/Home'
+import Settings from './pages/Settings'
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -12,67 +14,67 @@ const supabase = createClient(
 
 export default function App() {
   const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
   
-  // בדיקת הנתיב הנוכחי
   const path = window.location.pathname
 
   useEffect(() => {
+    // בדיקת סשן ראשונית
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
+      setLoading(false)
     })
 
+    // האזנה לשינויים בחיבור
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
+      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/' // חזרה לדף הבית אחרי יציאה
+  // מסך טעינה - מונע את הבהוב הדף הלבן והבעיות במעבר לדף הגדרות
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-blue-600 font-bold text-xl animate-pulse">טוען מערכת... 🚀</div>
+      </div>
+    )
   }
 
-  // --- ניתובים ---
-  
-  // 1. דף כרטיס ללקוח
+  // --- ניתובים (Routing) ---
+
+  // 1. שלב החיפוש
   if (path === '/ticket') {
+    return <SearchBusiness />
+  }
+
+  // 2. שלב הטופס
+  if (path === '/new-ticket') {
     return <NewTicket />
   }
 
-  // 2. דף התחברות למנהלים
+  // 3. דף הגדרות - מוגן
+  if (path === '/settings') {
+    if (!session) {
+      window.location.href = '/login'
+      return null
+    }
+    return <Settings session={session} />
+  }
+
+  // 4. דף התחברות
   if (path === '/login') {
-    if (session) return <Dashboard session={session} /> // אם כבר מחובר, לך לדשבורד
+    if (session) return <Dashboard session={session} />
     return <Login />
   }
 
-  // 3. דשבורד (רק אם מחובר ונמצא בדף הראשי או אחרי לוגין)
+  // 5. דשבורד מנהלים
   if (session && path === '/') {
-      // כאן נחליט: אם מחובר בדף הבית -> נראה דשבורד. אם לא -> נראה לובי.
-      // בוא נעשה את זה פשוט: מחוברים רואים דשבורד.
-      return (
-        <div className="min-h-screen bg-gray-100 dir-rtl font-sans">
-          <nav className="bg-white shadow-sm p-4 mb-6">
-            <div className="container mx-auto flex justify-between items-center">
-              <div className="font-bold text-xl text-blue-600">מערכת הניהול 💼</div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500 hidden md:inline">
-                  {session.user.email}
-                </span>
-                <button 
-                  onClick={handleLogout}
-                  className="bg-red-50 text-red-600 px-3 py-1 rounded border border-red-200 hover:bg-red-100 text-sm transition"
-                >
-                  יציאה
-                </button>
-              </div>
-            </div>
-          </nav>
-          <Dashboard session={session} />
-        </div>
-      )
+      return <Dashboard session={session} />
   }
 
-  // 4. ברירת מחדל: דף הבית (הלובי)
+  // 6. ברירת מחדל: דף הבית
   return <Home />
 }
