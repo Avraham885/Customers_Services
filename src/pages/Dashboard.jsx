@@ -11,13 +11,17 @@ export default function Dashboard({ session }) {
   const [loading, setLoading] = useState(true)
   const [businessName, setBusinessName] = useState('')
   const [businessId, setBusinessId] = useState(null)
+  
+  const [missingBusiness, setMissingBusiness] = useState(false)
+  const [newBizName, setNewBizName] = useState('')
+  const [creatingBiz, setCreatingBiz] = useState(false)
+
   const [activeFilter, setActiveFilter] = useState('הכל')
   const [dateFilter, setDateFilter] = useState('')
 
-  // סטטוסים ברירת מחדל
   const defaultStatuses = [
-    { name: 'חדש', description: 'פנייה חדשה שהתקבלה מלקוח', colorClass: 'bg-red-100 text-red-600 border-red-200', label: 'חדש' },
-    { name: 'בטיפול', description: 'פניה שנמצאת כרגע בטיפול', colorClass: 'bg-orange-100 text-orange-600 border-orange-200', label: 'בטיפול' },
+    { name: 'חדש', description: 'פניה חדשה שהתקבלה מלקוח', colorClass: 'bg-red-100 text-red-600 border-red-200', label: '✨ חדש' },
+    { name: 'בטיפול', description: 'פניה שנמצאת כרגע בטיפול', colorClass: 'bg-orange-100 text-orange-600 border-orange-200', label: '🛠️ בטיפול' },
     { name: 'סגור', description: 'טופל בקליק', colorClass: 'bg-green-100 text-green-600 border-green-200', label: '✅ סגור' }
   ]
 
@@ -32,42 +36,73 @@ export default function Dashboard({ session }) {
       setLoading(true)
       const user = session.user
 
-      // 1. שליפת פרטי העסק
       const { data: business, error: busError } = await supabase
         .from('businesses')
         .select('id, name')
         .eq('owner_id', user.id)
-        .single()
+        .maybeSingle() 
 
       if (busError) throw busError
+
+      if (!business) {
+        setMissingBusiness(true)
+        setLoading(false)
+        return
+      }
+
       setBusinessId(business.id)
       setBusinessName(business.name)
 
-      // 2. שליפת סטטוסים מותאמים אישית
       const { data: customStatuses } = await supabase
         .from('ticket_statuses')
         .select('*')
         .eq('business_id', business.id)
         .eq('is_active', true)
       
-      // מיזוג: ברירת מחדל + מותאמים אישית
       if (customStatuses && customStatuses.length > 0) {
         const formattedCustom = customStatuses.map(s => ({
           name: s.name,
           description: s.description,
-          colorClass: s.color, // זה ה-string של הקלאסים ששמרנו
+          colorClass: s.color,
           label: s.name
         }))
         setStatusConfig([...defaultStatuses, ...formattedCustom])
       }
 
-      // 3. שליפת פניות
       await fetchTickets(business.id)
 
     } catch (error) {
       console.error('Error loading dashboard:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateBusiness = async (e) => {
+    e.preventDefault()
+    if (!newBizName.trim()) return
+    setCreatingBiz(true)
+
+    try {
+        const user = session.user
+        const { error } = await supabase
+            .from('businesses')
+            .insert([{
+                owner_id: user.id,
+                name: newBizName,
+                email: user.email
+            }])
+            .select()
+            .single()
+
+        if (error) throw error
+        window.location.reload()
+
+    } catch (error) {
+        console.error("Error creating business:", error)
+        alert("שגיאה ביצירת העסק.")
+    } finally {
+        setCreatingBiz(false)
     }
   }
 
@@ -83,7 +118,6 @@ export default function Dashboard({ session }) {
     }
   }
 
-  // מכאן והלאה - הלוגיקה זהה, רק משתמשת ב-statusConfig הדינמי
   const statusStats = useMemo(() => {
     const initialCounts = statusConfig.reduce((acc, curr) => {
       acc[curr.name] = 0;
@@ -92,7 +126,6 @@ export default function Dashboard({ session }) {
 
     const stats = tickets.reduce((acc, ticket) => {
       const status = ticket.status || 'חדש';
-      // אם יש סטטוס ישן שלא קיים כבר בקונפיג, נוסיף אותו לספירה שלא יעלם
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, initialCounts);
@@ -138,6 +171,30 @@ export default function Dashboard({ session }) {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-blue-600 text-xl animate-pulse">טוען דשבורד... 🚀</div>
 
+  if (missingBusiness) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dir-rtl font-sans p-4">
+            <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center space-y-6">
+                <div className="text-4xl">🏗️</div>
+                <h2 className="text-2xl font-black text-gray-800">השלמת הגדרות העסק</h2>
+                <form onSubmit={handleCreateBusiness} className="space-y-4">
+                    <input 
+                        type="text" 
+                        required
+                        placeholder="שם העסק שלך" 
+                        className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-right"
+                        value={newBizName}
+                        onChange={e => setNewBizName(e.target.value)}
+                    />
+                    <button type="submit" disabled={creatingBiz} className="w-full py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg transition-all">
+                        {creatingBiz ? 'יוצר עסק...' : 'צור עסק והכנס לדשבורד ➜'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50 font-sans dir-rtl text-right">
       
@@ -162,7 +219,7 @@ export default function Dashboard({ session }) {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-6 pb-12 space-y-8 animate-fade-in-up">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 pb-12 space-y-8 animate-fade-in-up">
         
         {/* Header & Stats */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -170,13 +227,12 @@ export default function Dashboard({ session }) {
             <h2 className="text-3xl font-black text-gray-900 tracking-tight" style={{ fontFamily: 'Heebo, sans-serif' }}>דשבורד ניהול</h2>
             <p className="text-gray-500 mt-1">צפה בפניות הלקוחות ונהל את הטיפול בהן</p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <div className="bg-white px-6 py-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center min-w-[100px]">
+          <div className="flex flex-wrap gap-3 w-full md:w-auto">
+            <div className="bg-white px-6 py-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center flex-1 md:flex-none min-w-[100px]">
               <span className="text-3xl font-black text-gray-800" style={{ fontFamily: 'Heebo, sans-serif' }}>{tickets.length}</span>
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">סה"כ</span>
             </div>
             {Object.entries(statusStats).map(([status, count]) => {
-              // נציג רק סטטוסים שיש בהם תוכן או שהם ברירת מחדל
               if (count === 0 && !defaultStatuses.some(d => d.name === status)) return null;
               
               const config = getConfig(status);
@@ -186,9 +242,24 @@ export default function Dashboard({ session }) {
               const bgClass = colorClass.split(' ').find(c => c.startsWith('bg-')) || 'bg-gray-50';
 
               return (
-                <div key={status} className={`px-6 py-3 rounded-2xl border flex flex-col items-center min-w-[100px] shadow-sm bg-white ${borderColor} ${bgClass} bg-opacity-10`}>
+                <div key={status} className={`group/tooltip relative px-6 py-3 rounded-2xl border flex flex-col items-center flex-1 md:flex-none min-w-[100px] shadow-sm bg-white ${borderColor} ${bgClass} bg-opacity-10 cursor-help transition-transform hover:-translate-y-1`}>
                   <span className={`text-3xl font-black ${textColor}`} style={{ fontFamily: 'Heebo, sans-serif' }}>{count}</span>
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{status}</span>
+                  
+                  {/* הבועה: מיקום חדש (למטה) ועיצוב לבן */}
+                  <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-300 pointer-events-none z-50">
+                    <div className="bg-white text-gray-700 p-4 rounded-xl shadow-2xl border border-gray-100 text-center relative">
+                      {/* החץ (משולש) מצביע למעלה */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-8 border-transparent border-b-white drop-shadow-sm"></div>
+                      
+                      <div className="font-black text-gray-900 mb-1 text-sm" style={{ fontFamily: 'Rubik, sans-serif' }}>
+                        {config.name}
+                      </div>
+                      <div className="text-gray-500 text-xs leading-relaxed" style={{ fontFamily: 'Rubik, sans-serif' }}>
+                        {config.description}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -197,23 +268,64 @@ export default function Dashboard({ session }) {
 
         {/* Filters */}
         <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 justify-center md:justify-start w-full">
             {availableFilters.map(status => (
-              <button key={status} onClick={() => setActiveFilter(status)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeFilter === status ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}>
+              <button key={status} onClick={() => setActiveFilter(status)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex-1 md:flex-none ${activeFilter === status ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}>
                 {status}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
-            <span className="text-sm text-gray-400 font-bold px-2">📅 תאריך:</span>
-            <input type="date" className="bg-white border border-gray-200 text-gray-700 text-sm rounded-md p-1.5 outline-none focus:ring-2 focus:ring-blue-500" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
+          <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-lg border border-gray-200 w-full md:w-auto">
+            <span className="text-sm text-gray-400 font-bold px-2 whitespace-nowrap">📅 תאריך:</span>
+            <input type="date" className="bg-white border border-gray-200 text-gray-700 text-sm rounded-md p-1.5 outline-none focus:ring-2 focus:ring-blue-500 w-full" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
             {dateFilter && <button onClick={() => setDateFilter('')} className="text-gray-400 hover:text-red-500 px-2">✕</button>}
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100">
-          <div className="rounded-2xl overflow-visible">
+        {/* --- תצוגת מובייל (כרטיסיות) --- */}
+        <div className="grid grid-cols-1 gap-4 md:hidden">
+          {filteredTickets.length === 0 ? (
+             <div className="p-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100"><div className="text-4xl mb-2">📅</div>לא נמצאו פניות</div>
+          ) : (
+            filteredTickets.map(ticket => {
+              const config = getConfig(ticket.status);
+              return (
+                <div key={ticket.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-gray-900 text-lg">{ticket.customer_name}</span>
+                      <a href={`tel:${ticket.customer_phone}`} className="text-sm text-blue-600 dir-ltr text-right">{ticket.customer_phone}</a>
+                    </div>
+                    <select value={ticket.status} onChange={(e) => handleStatusChange(ticket.id, e.target.value)} className={`text-xs font-bold py-1.5 px-3 rounded-lg border outline-none ${config.colorClass}`}>
+                      {statusConfig.map(status => <option key={status.name} value={status.name}>{status.label}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded-xl text-sm text-gray-600 border border-gray-100">
+                    <span className="font-bold text-gray-800 block mb-1 text-xs bg-gray-200 w-fit px-2 py-0.5 rounded-full">{ticket.category || 'כללי'}</span>
+                    {ticket.description}
+                  </div>
+
+                  <div className="flex justify-between items-center border-t border-gray-50 pt-3 mt-1">
+                     <div className="text-xs text-gray-400">
+                        {new Date(ticket.created_at).toLocaleDateString('he-IL')} | {new Date(ticket.created_at).toLocaleTimeString('he-IL', {hour: '2-digit', minute:'2-digit'})}
+                     </div>
+                     <div className="flex gap-3">
+                        {ticket.image_url && (
+                          <a href={ticket.image_url} target="_blank" rel="noreferrer" className="text-xl">🖼️</a>
+                        )}
+                        <button onClick={() => handleDeleteTicket(ticket.id)} className="text-gray-300 hover:text-red-500 text-xl">🗑️</button>
+                     </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* --- תצוגת מחשב (טבלה) - מוסתר במובייל --- */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 hidden md:block">
+          <div className="rounded-2xl overflow-visible"> 
             <table className="w-full">
               <thead className="bg-gray-50/50 border-b border-gray-100">
                 <tr>
@@ -235,18 +347,9 @@ export default function Dashboard({ session }) {
                     return (
                       <tr key={ticket.id} className="hover:bg-blue-50/30 transition-colors group/row relative hover:z-50">
                         <td className="px-6 py-4 align-top overflow-visible relative">
-                          <div className="relative group/tooltip inline-block w-full">
                             <select value={ticket.status} onChange={(e) => handleStatusChange(ticket.id, e.target.value)} className={`w-full text-xs font-bold py-2 px-3 rounded-xl border cursor-pointer outline-none transition-all shadow-sm appearance-none text-center ${config.colorClass}`} style={{ fontFamily: 'Rubik, sans-serif' }}>
                               {statusConfig.map(status => <option key={status.name} value={status.name}>{status.label}</option>)}
                             </select>
-                            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-64 opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-300 pointer-events-none z-50">
-                              <div className="bg-white text-gray-700 p-4 rounded-xl shadow-2xl border border-gray-100 relative">
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-white drop-shadow-sm"></div>
-                                <div className="font-black text-gray-900 mb-1 text-sm">{config.name}</div>
-                                <div className="leading-relaxed text-gray-500 text-xs">{config.description}</div>
-                              </div>
-                            </div>
-                          </div>
                         </td>
                         <td className="px-6 py-4 align-top">
                           <div className="text-sm font-medium text-gray-900">{new Date(ticket.created_at).toLocaleDateString('he-IL')}</div>
