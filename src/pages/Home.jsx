@@ -13,7 +13,7 @@ export default function Home() {
           href="/login" 
           className="bg-white text-blue-600 px-5 py-2 rounded-full font-bold shadow-sm border border-blue-100 hover:shadow-md hover:bg-blue-50 transition-all text-sm"
         >
-          כניסה ללקוחות 💼
+          כניסת משתמשים 💼
         </a>
       </header>
 
@@ -27,7 +27,7 @@ export default function Home() {
           
           <p className="text-xl md:text-2xl text-gray-500 font-light max-w-2xl mx-auto leading-relaxed">
             מערכת זו נועדה לנהל בצורה יעילה, חכמה ומהירה את הפניות של הלקוחות שלכם.
-            הפכו את השירות לחוויה.
+            הפכו את השירות לחוויה
           </p>
 
           <div className="pt-8">

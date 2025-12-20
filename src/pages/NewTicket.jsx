@@ -120,7 +120,7 @@ export default function NewTicket() {
 
     } catch (error) {
       console.error('Error submitting ticket:', error)
-      alert('אירעה שגיאה בשליחת הפנייה. נסה שנית.')
+      alert('אירעה שגיאה בשליחת הפנייה. נסה שנית')
     } finally {
       setUploading(false)
     }
@@ -230,7 +230,7 @@ export default function NewTicket() {
                 value={formData.category}
                 onChange={e => setFormData({...formData, category: e.target.value})}
               >
-                <option value="" disabled>בחר נושא מהרשימה...</option>
+                <option value="" disabled>בחר נושא מהרשימה</option>
                 {categories.length > 0 ? (
                   categories.map(cat => (
                     <option key={cat.name} value={cat.name}>{cat.name}</option>

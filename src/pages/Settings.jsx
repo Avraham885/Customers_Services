@@ -20,10 +20,13 @@ export default function Settings({ session }) {
   const [statuses, setStatuses] = useState([])
   const [newStatusName, setNewStatusName] = useState('')
   const [newStatusDesc, setNewStatusDesc] = useState('')
-  const [newStatusColor, setNewStatusColor] = useState('blue') // ברירת מחדל
+  const [newStatusColor, setNewStatusColor] = useState('blue')
   const [addingStatus, setAddingStatus] = useState(false)
 
-  // צבעים לבחירה לסטטוסים
+  // -- חדש: שינוי סיסמה --
+  const [newPassword, setNewPassword] = useState('')
+  const [passLoading, setPassLoading] = useState(false)
+
   const colorOptions = [
     { name: 'gray', label: 'אפור', class: 'bg-gray-100 text-gray-600 border-gray-200' },
     { name: 'red', label: 'אדום', class: 'bg-red-100 text-red-600 border-red-200' },
@@ -105,10 +108,7 @@ export default function Settings({ session }) {
     e.preventDefault()
     if (!newStatusName.trim()) return
     setAddingStatus(true)
-
-    // מציאת מחרוזת ה-CSS המלאה לפי הצבע שנבחר
     const selectedColorClass = colorOptions.find(c => c.name === newStatusColor)?.class || colorOptions[0].class
-
     try {
       const { data, error } = await supabase
         .from('ticket_statuses')
@@ -133,12 +133,34 @@ export default function Settings({ session }) {
     setStatuses(statuses.filter(s => s.id !== id))
   }
 
+  // --- לוגיקת שינוי סיסמה (חדש) ---
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault()
+    if (!newPassword || newPassword.length < 6) {
+      alert('הסיסמה חייבת להכיל לפחות 6 תווים')
+      return
+    }
+    
+    setPassLoading(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      
+      alert('הסיסמה שונתה בהצלחה!')
+      setNewPassword('')
+    } catch (error) {
+      console.error(error)
+      alert('שגיאה בשינוי הסיסמה. נסה שנית מאוחר יותר')
+    } finally {
+      setPassLoading(false)
+    }
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-blue-600 text-xl animate-pulse">טוען הגדרות...</div>
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans dir-rtl text-right pb-20">
       
-      {/* Navbar */}
       <nav className="bg-white/80 backdrop-blur border-b border-white/20 px-6 py-4 mb-8 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -166,10 +188,9 @@ export default function Settings({ session }) {
               🏷️ נושאי פנייה
             </h2>
             <p className="text-gray-500 max-w-xl">
-              הגדר את הנושאים שיופיעו ללקוח בטופס הפנייה. זה יעזור לך לסנן ולהבין על מה הלקוחות מתלוננים
+              הגדר את הנושאים שיופיעו ללקוח בטופס הפנייה
             </p>
           </div>
-
           <div className="p-8">
             <form onSubmit={handleAddCategory} className="flex flex-col md:flex-row gap-4 items-end mb-8">
               <div className="flex-grow w-full space-y-2">
@@ -190,7 +211,6 @@ export default function Settings({ session }) {
                 {addingCat ? '...' : 'הוסף +'}
               </button>
             </form>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {categories.map((cat) => (
                 <div key={cat.id} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded-2xl group hover:bg-white hover:shadow-md transition-all duration-300">
@@ -203,20 +223,18 @@ export default function Settings({ session }) {
           </div>
         </div>
 
-        {/* כרטיס 2: ניהול סטטוסים (החדש!) */}
+        {/* כרטיס 2: ניהול סטטוסים */}
         <div className="bg-white rounded-3xl shadow-xl border border-white/50 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <div className="p-8 border-b border-gray-100 bg-gradient-to-r from-purple-50/50 to-transparent">
             <h2 className="text-2xl font-black text-gray-800 mb-2" style={{ fontFamily: 'Heebo, sans-serif' }}>
                סטטוסים מותאמים אישית
             </h2>
             <p className="text-gray-500 max-w-xl">
-              הוסף מצבי טיפול מיוחדים (למשל: "דחוף", "ממתין לחלקים"). הם יופיעו בדשבורד עם הצבע שתבחר.
+              הוסף מצבי טיפול מיוחדים (למשל: "דחוף", "מעקב").
             </p>
           </div>
-
           <div className="p-8">
             <form onSubmit={handleAddStatus} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end mb-8 bg-gray-50/50 p-6 rounded-2xl border border-gray-100">
-              
               <div className="md:col-span-3 space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">שם הסטטוס</label>
                 <input
@@ -227,18 +245,16 @@ export default function Settings({ session }) {
                   onChange={(e) => setNewStatusName(e.target.value)}
                 />
               </div>
-
               <div className="md:col-span-5 space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">תיאור (לבועה)</label>
                 <input
                   type="text"
-                  placeholder="הסבר קצר שיופיע על הסטטוס"
+                  placeholder="הסבר קצר שיופיע במעבר עכבר"
                   className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-100 outline-none"
                   value={newStatusDesc}
                   onChange={(e) => setNewStatusDesc(e.target.value)}
                 />
               </div>
-
               <div className="md:col-span-2 space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">צבע</label>
                 <div className="flex gap-1">
@@ -253,7 +269,6 @@ export default function Settings({ session }) {
                   ))}
                 </div>
               </div>
-
               <div className="md:col-span-2">
                 <button
                   type="submit"
@@ -264,12 +279,10 @@ export default function Settings({ session }) {
                 </button>
               </div>
             </form>
-
             <div className="space-y-3">
               {statuses.map((status) => (
                 <div key={status.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition group">
                   <div className="flex items-center gap-4">
-                    {/* תצוגה מקדימה של הסטטוס */}
                     <span className={`px-3 py-1 rounded-lg text-xs font-bold ${status.color}`}>
                       {status.name}
                     </span>
@@ -280,8 +293,41 @@ export default function Settings({ session }) {
                   <button onClick={() => handleDeleteStatus(status.id)} className="text-gray-300 hover:text-red-500 p-2 transition">🗑️</button>
                 </div>
               ))}
-              {statuses.length === 0 && <p className="text-gray-400 text-center py-2 text-sm">במידה ואין סטטוסים מותאמים אישית, המערכת תשתמש בברירת המחדל</p>}
+              {statuses.length === 0 && <p className="text-gray-400 text-center py-2 text-sm">אין סטטוסים מותאמים אישית.</p>}
             </div>
+          </div>
+        </div>
+
+        {/* --- כרטיס 3 (חדש): אבטחה ופרטיות --- */}
+        <div className="bg-white rounded-3xl shadow-xl border border-white/50 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <div className="p-8 border-b border-gray-100 bg-gradient-to-r from-red-50/50 to-transparent">
+            <h2 className="text-2xl font-black text-gray-800 mb-2" style={{ fontFamily: 'Heebo, sans-serif' }}>
+              🔒 אבטחה ופרטיות
+            </h2>
+            <p className="text-gray-500 max-w-xl">
+              נהל את פרטי הגישה לחשבון שלך
+            </p>
+          </div>
+          <div className="p-8">
+             <form onSubmit={handleUpdatePassword} className="max-w-md space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">שינוי סיסמה</label>
+                  <input
+                    type="password"
+                    placeholder="הזן סיסמה חדשה (לפחות 6 תווים)"
+                    className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-red-100 focus:border-red-400 outline-none transition font-medium"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={passLoading || !newPassword}
+                  className="w-full py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all disabled:opacity-50 disabled:bg-gray-400"
+                >
+                  {passLoading ? 'מעדכן סיסמה...' : 'שמור סיסמה חדשה'}
+                </button>
+             </form>
           </div>
         </div>
 

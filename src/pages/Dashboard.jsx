@@ -20,8 +20,8 @@ export default function Dashboard({ session }) {
   const [dateFilter, setDateFilter] = useState('')
 
   const defaultStatuses = [
-    { name: 'חדש', description: 'פניה חדשה שהתקבלה מלקוח', colorClass: 'bg-red-100 text-red-600 border-red-200', label: '✨ חדש' },
-    { name: 'בטיפול', description: 'פניה שנמצאת כרגע בטיפול', colorClass: 'bg-orange-100 text-orange-600 border-orange-200', label: '🛠️ בטיפול' },
+    { name: 'חדש', description: 'פניה חדשה שהתקבלה מלקוח', colorClass: 'bg-red-100 text-red-600 border-red-200', label: 'חדש' },
+    { name: 'בטיפול', description: 'פניה שנמצאת כרגע בטיפול', colorClass: 'bg-orange-100 text-orange-600 border-orange-200', label: 'בטיפול' },
     { name: 'סגור', description: 'טופל בקליק', colorClass: 'bg-green-100 text-green-600 border-green-200', label: '✅ סגור' }
   ]
 
@@ -100,7 +100,7 @@ export default function Dashboard({ session }) {
 
     } catch (error) {
         console.error("Error creating business:", error)
-        alert("שגיאה ביצירת העסק.")
+        alert("שגיאה ביצירת העסק")
     } finally {
         setCreatingBiz(false)
     }
