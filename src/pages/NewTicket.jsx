@@ -81,15 +81,18 @@ export default function NewTicket() {
       let imageUrl = null
 
       // העלאת תמונה אם יש
+      // העלאת תמונה אם יש
       if (formData.image) {
-        const fileName = `${Date.now()}_${formData.image.name}`
+        // תיקון: יצירת שם קובץ "בטוח" באנגלית בלבד (למשל: 1766255_img.jpg)
+        const fileExt = formData.image.name.split('.').pop()
+        const fileName = `${Date.now()}_img.${fileExt}`
+
         const { error: uploadError } = await supabase.storage
           .from('ticket-images')
           .upload(fileName, formData.image)
 
         if (uploadError) throw uploadError
         
-        // קבלת הלינק הציבורי
         const { data: { publicUrl } } = supabase.storage
           .from('ticket-images')
           .getPublicUrl(fileName)
